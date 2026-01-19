@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thailand Electricity Usage Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); padding: 1.5rem; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .table-container { overflow-x: auto; max-height: 500px; border-radius: 0.5rem; }
+        thead th { position: sticky; top: 0; background-color: #f8fafc; z-index: 10; }
+        /* Loader */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <nav class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Electricity Data Analytics
+            </h1>
+            <div class="text-xs text-slate-400 mt-2 md:mt-0">
+                Source: PEA/MEA Reports (JSON)
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 space-y-6">
+
+        <div class="card bg-white border border-slate-200">
+            <div class="flex flex-col md:flex-row gap-6 items-end justify-between">
+                <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                    <div class="w-full md:w-48">
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Year (BE)</label>
+                        <select id="yearFilter" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                            <option>Loading...</option>
+                        </select>
+                    </div>
+                    <div class="w-full md:w-64">
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Province</label>
+                        <select id="provinceFilter" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5">
+                            <option value="all">All Provinces</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-2xl font-bold text-slate-800" id="totalRecordsDisplay">0</p>
+                    <p class="text-xs text-slate-500">Records Loaded</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingMessage" class="text-center py-10">
+            <div class="loader"></div>
+            <p class="text-slate-500 mt-2">Fetching data files...</p>
+        </div>
+
+        <div id="dashboardContent" class="hidden space-y-6">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="card border-l-4 border-blue-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Total Users</p>
+                            <h2 class="text-3xl font-bold text-slate-800 mt-2" id="kpiUsers">0</h2>
+                        </div>
+                        <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="card border-l-4 border-yellow-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Total Consumption</p>
+                            <h2 class="text-3xl font-bold text-slate-800 mt-2" id="kpiUsage">0</h2>
+                            <p class="text-xs text-slate-400 mt-1">kWh / Year</p>
+                        </div>
+                        <div class="p-2 bg-yellow-50 rounded-lg text-yellow-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="card border-l-4 border-emerald-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase">Avg Usage / User</p>
+                            <h2 class="text-3xl font-bold text-slate-800 mt-2" id="kpiAvg">0</h2>
+                            <p class="text-xs text-slate-400 mt-1">kWh / User</p>
+                        </div>
+                        <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="card">
+                    <h3 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Usage vs Users by Sector</h3>
+                    <div class="chart-container">
+                        <canvas id="sectorChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Consumption Share</h3>
+                    <div class="chart-container flex justify-center">
+                        <canvas id="shareChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="topProvincesCard">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="text-lg font-bold text-slate-700">Top 10 Provinces by Consumption (kWh)</h3>
+                    <span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Highest First</span>
+                </div>
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="topProvincesChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="text-lg font-bold text-slate-700 mb-4 border-b pb-2">Detailed Data View</h3>
+                <div class="table-container">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Province</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sector Type</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Usage (kWh)</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Avg (kWh/User)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 text-sm" id="dataTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div> </div>
+
+    <script>
+        // --- Global State ---
+        let rawUsers = [];
+        let rawUsages = [];
+        let chartInstances = {};
+
+        // --- Categories Config ---
+        // Maps the JSON keys for users (suffix _count) to usages (suffix _kwh)
+        const categories = [
+            { id: 'residential', label: 'Residential' },
+            { id: 'small_business', label: 'Small Biz' },
+            { id: 'medium_business', label: 'Medium Biz' },
+            { id: 'large_business', label: 'Large Biz' },
+            { id: 'specialized_business', label: 'Specialized' },
+            { id: 'government_state_enterprise', label: 'Gov & State' },
+            { id: 'public_electricity', label: 'Public Elec' },
+            { id: 'water_pumping', label: 'Agriculture/Pumping' },
+            { id: 'ev_charging', label: 'EV Charging' }
+        ];
+
+        // --- 1. Fetch Data ---
+        async function loadData() {
+            try {
+                // Fetch both files in parallel
+                const [usersResponse, usagesResponse] = await Promise.all([
+                    fetch('electricity_users_en.json'),
+                    fetch('electricity_usages_en.json')
+                ]);
+
+                if (!usersResponse.ok || !usagesResponse.ok) {
+                    throw new Error("Failed to fetch one or more files.");
+                }
+
+                rawUsers = await usersResponse.json();
+                const usageJson = await usagesResponse.json();
+                
+                // IMPORTANT: usages file has a "Sheet1" root key based on user input
+                rawUsages = usageJson.Sheet1 ? usageJson.Sheet1 : usageJson;
+
+                initializeDashboard();
+
+            } catch (error) {
+                console.error("Data Load Error:", error);
+                document.getElementById('loadingMessage').innerHTML = `
+                    <div class="text-red-500 font-bold text-xl mb-2">Error Loading Data</div>
+                    <p class="text-gray-600">Could not load JSON files.</p>
+                    <p class="text-sm text-gray-400 mt-4">Tip: If opening locally, use "Live Server" in VS Code to avoid CORS errors.</p>
+                `;
+            }
+        }
+
+        // --- 2. Initialize UI ---
+        function initializeDashboard() {
+            // Hide Loader, Show Dashboard
+            document.getElementById('loadingMessage').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+
+            // 1. Populate Filters
+            const uniqueYears = [...new Set(rawUsers.map(d => d.year))].sort((a,b) => b - a);
+            const uniqueProvinces = [...new Set(rawUsers.map(d => d.province_name))].sort((a, b) => a.localeCompare(b));
+
+            const yearSelect = document.getElementById('yearFilter');
+            const provSelect = document.getElementById('provinceFilter');
+
+            yearSelect.innerHTML = uniqueYears.map(y => `<option value="${y}">${y}</option>`).join('');
+            provSelect.innerHTML = `<option value="all">All Provinces</option>` + 
+                                   uniqueProvinces.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            // 2. Add Event Listeners
+            yearSelect.addEventListener('change', updateDashboard);
+            provSelect.addEventListener('change', updateDashboard);
+
+            // 3. Initial Update
+            updateDashboard();
+        }
+
+        // --- 3. Update Logic ---
+        function updateDashboard() {
+            const selectedYear = parseInt(document.getElementById('yearFilter').value);
+            const selectedProv = document.getElementById('provinceFilter').value;
+
+            // -- Filter Data --
+            const filteredUsers = rawUsers.filter(d => d.year === selectedYear && (selectedProv === 'all' || d.province_name === selectedProv));
+            const filteredUsages = rawUsages.filter(d => d.year === selectedYear && (selectedProv === 'all' || d.province_name === selectedProv));
+
+            document.getElementById('totalRecordsDisplay').textContent = filteredUsers.length;
+
+            // -- Aggregate Data --
+            // We aggregate totals for KPI and Charts
+            let aggData = categories.map(cat => ({
+                id: cat.id,
+                label: cat.label,
+                users: 0,
+                kwh: 0
+            }));
+
+            let totalUsers = 0;
+            let totalKwh = 0;
+
+            // Map for O(1) usage lookup
+            // Key: province_code (assuming it is unique per year/province)
+            const usageMap = new Map();
+            filteredUsages.forEach(u => usageMap.set(u.province_code, u));
+
+            // Combine data for Table rows
+            let tableRows = [];
+
+            filteredUsers.forEach(userRecord => {
+                const usageRecord = usageMap.get(userRecord.province_code);
+                
+                // Aggregate for Categories
+                categories.forEach((cat, index) => {
+                    const uCount = userRecord[`${cat.id}_count`] || 0;
+                    const uKwh = usageRecord ? (usageRecord[`${cat.id}_kwh`] || 0) : 0;
+
+                    aggData[index].users += uCount;
+                    aggData[index].kwh += uKwh;
+
+                    totalUsers += uCount;
+                    totalKwh += uKwh;
+
+                    // For table (if specific province selected, show details by sector)
+                    if (selectedProv !== 'all' && uCount > 0) {
+                        tableRows.push({
+                            prov: userRecord.province_name,
+                            type: cat.label,
+                            users: uCount,
+                            kwh: uKwh,
+                            avg: uCount > 0 ? uKwh / uCount : 0
+                        });
+                    }
+                });
+
+                // If 'All Provinces', row is total per province
+                if (selectedProv === 'all') {
+                    // Calculate province totals
+                    let pUsers = 0;
+                    let pKwh = 0;
+                    categories.forEach(cat => {
+                        pUsers += userRecord[`${cat.id}_count`] || 0;
+                        pKwh += usageRecord ? (usageRecord[`${cat.id}_kwh`] || 0) : 0;
+                    });
+                    tableRows.push({
+                        prov: userRecord.province_name,
+                        type: 'Total All Sectors',
+                        users: pUsers,
+                        kwh: pKwh,
+                        avg: pUsers > 0 ? pKwh / pUsers : 0
+                    });
+                }
+            });
+
+            // -- Update KPIs --
+            document.getElementById('kpiUsers').innerText = totalUsers.toLocaleString();
+            document.getElementById('kpiUsage').innerText = (totalKwh / 1000000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + " M";
+            document.getElementById('kpiAvg').innerText = totalUsers > 0 ? Math.round(totalKwh / totalUsers).toLocaleString() : 0;
+
+            // -- Update Charts --
+            renderSectorChart(aggData);
+            renderShareChart(aggData);
+            
+            // Only show Top Province chart if 'All' is selected
+            const topProvCard = document.getElementById('topProvincesCard');
+            if (selectedProv === 'all') {
+                topProvCard.classList.remove('hidden');
+                renderTopProvincesChart(tableRows); // tableRows contains province totals in 'all' mode
+            } else {
+                topProvCard.classList.add('hidden');
+            }
+
+            // -- Update Table --
+            renderTable(tableRows);
+        }
+
+        // --- 4. Render Functions ---
+
+        function renderSectorChart(data) {
+            const ctx = document.getElementById('sectorChart').getContext('2d');
+            
+            // Destroy prev chart
+            if (chartInstances.sector) chartInstances.sector.destroy();
+
+            chartInstances.sector = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.label),
+                    datasets: [
+                        {
+                            label: 'Users (Left Axis)',
+                            data: data.map(d => d.users),
+                            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Usage kWh (Right Axis)',
+                            type: 'line',
+                            data: data.map(d => d.kwh),
+                            borderColor: 'rgba(234, 179, 8, 1)',
+                            backgroundColor: 'rgba(234, 179, 8, 0.2)',
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'Users'} },
+                        y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: {display: true, text: 'kWh'} }
+                    }
+                }
+            });
+        }
+
+        function renderShareChart(data) {
+            const ctx = document.getElementById('shareChart').getContext('2d');
+            if (chartInstances.share) chartInstances.share.destroy();
+
+            // Filter out tiny segments for cleaner pie
+            const cleanData = data.filter(d => d.kwh > 0);
+
+            chartInstances.share = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: cleanData.map(d => d.label),
+                    datasets: [{
+                        data: cleanData.map(d => d.kwh),
+                        backgroundColor: [
+                            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#6366f1', 
+                            '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: {size: 10} } }
+                    }
+                }
+            });
+        }
+
+        function renderTopProvincesChart(rows) {
+            const ctx = document.getElementById('topProvincesChart').getContext('2d');
+            if (chartInstances.top) chartInstances.top.destroy();
+
+            // Sort by usage and take top 10
+            const sorted = [...rows].sort((a,b) => b.kwh - a.kwh).slice(0, 10);
+
+            chartInstances.top = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(d => d.prov),
+                    datasets: [{
+                        label: 'Total Consumption (kWh)',
+                        data: sorted.map(d => d.kwh),
+                        backgroundColor: '#6366f1',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Horizontal Bar
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function renderTable(rows) {
+            const tbody = document.getElementById('dataTableBody');
+            
+            // Sort rows: Province name asc, then Type
+            rows.sort((a,b) => {
+                if(a.prov < b.prov) return -1;
+                if(a.prov > b.prov) return 1;
+                return 0;
+            });
+
+            // Limit rows for performance if needed, but 100 is fine
+            const displayRows = rows.slice(0, 500); 
+
+            tbody.innerHTML = displayRows.map(row => `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${row.prov}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500">${row.type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-mono">${row.users.toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-mono text-blue-600">${row.kwh.toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-mono text-gray-500">${Math.round(row.avg).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Start App
+        loadData();
+
+    </script>
+</body>
+</html>
